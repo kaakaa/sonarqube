@@ -134,7 +134,7 @@ public class ComponentIndexerTest {
   }
 
   private void index(String uuid) {
-    createIndexer().index(uuid);
+    createIndexer().indexByProjectUuid(uuid);
   }
 
   private long count() {
