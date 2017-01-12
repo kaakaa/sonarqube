@@ -38,6 +38,8 @@ import org.sonar.db.component.ComponentDbTester;
 import org.sonar.db.component.ComponentDto;
 import org.sonar.server.component.ComponentFinder;
 import org.sonar.server.component.ComponentService;
+import org.sonar.server.component.index.ComponentIndexDefinition;
+import org.sonar.server.component.index.ComponentIndexer;
 import org.sonar.server.es.EsTester;
 import org.sonar.server.exceptions.BadRequestException;
 import org.sonar.server.exceptions.ForbiddenException;
@@ -79,7 +81,8 @@ public class BulkUpdateKeyActionTest {
   public UserSessionRule userSession = UserSessionRule.standalone();
 
   @Rule
-  public EsTester es = new EsTester(new ProjectMeasuresIndexDefinition(new MapSettings()));
+  public EsTester es = new EsTester(new ProjectMeasuresIndexDefinition(new MapSettings()),
+    new ComponentIndexDefinition(new MapSettings()));
 
   @Rule
   public DbTester db = DbTester.create(system2);
@@ -91,7 +94,9 @@ public class BulkUpdateKeyActionTest {
   ComponentFinder componentFinder = new ComponentFinder(dbClient);
 
   WsActionTester ws = new WsActionTester(
-    new BulkUpdateKeyAction(dbClient, componentFinder, new ComponentService(dbClient, null, null, null, null, new ProjectMeasuresIndexer(system2, dbClient, es.client())), userSession));
+    new BulkUpdateKeyAction(dbClient, componentFinder,
+      new ComponentService(dbClient, null, null, null, null, new ProjectMeasuresIndexer(system2, dbClient, es.client()), new ComponentIndexer(dbClient, es.client())),
+      userSession));
 
   @Before
   public void setUp() {

@@ -37,6 +37,8 @@ import org.sonar.db.component.ComponentDbTester;
 import org.sonar.db.component.ComponentDto;
 import org.sonar.db.component.ComponentTesting;
 import org.sonar.db.component.ResourceIndexDao;
+import org.sonar.server.component.index.ComponentIndexDefinition;
+import org.sonar.server.component.index.ComponentIndexer;
 import org.sonar.server.es.EsTester;
 import org.sonar.server.exceptions.BadRequestException;
 import org.sonar.server.exceptions.NotFoundException;
@@ -72,7 +74,8 @@ public class ComponentServiceTest {
   public ExpectedException expectedException = ExpectedException.none();
 
   @Rule
-  public EsTester es = new EsTester(new ProjectMeasuresIndexDefinition(new MapSettings()));
+  public EsTester es = new EsTester(new ProjectMeasuresIndexDefinition(new MapSettings()),
+    new ComponentIndexDefinition(new MapSettings()));
 
   @Rule
   public DbTester dbTester = DbTester.create(System2.INSTANCE);
@@ -82,6 +85,7 @@ public class ComponentServiceTest {
   private DbSession dbSession = dbTester.getSession();
   private I18nRule i18n = new I18nRule();
   private ProjectMeasuresIndexer projectMeasuresIndexer = new ProjectMeasuresIndexer(system2, dbClient, es.client());
+  private ComponentIndexer componentIndexer = new ComponentIndexer(dbClient, es.client());
 
   private ComponentService underTest;
 
@@ -89,7 +93,7 @@ public class ComponentServiceTest {
   public void setUp() {
     i18n.put("qualifier.TRK", "Project");
 
-    underTest = new ComponentService(dbClient, i18n, userSession, system2, new ComponentFinder(dbClient), projectMeasuresIndexer);
+    underTest = new ComponentService(dbClient, i18n, userSession, system2, new ComponentFinder(dbClient), projectMeasuresIndexer, componentIndexer);
   }
 
   @Test
@@ -255,7 +259,7 @@ public class ComponentServiceTest {
       ComponentTesting.newProjectDto().setId(2L).setKey(projectKey),
       ComponentTesting.newProjectDto().setId(3L).setKey(projectKey)));
 
-    underTest = new ComponentService(dbClient, i18n, userSession, System2.INSTANCE, new ComponentFinder(dbClient), projectMeasuresIndexer);
+    underTest = new ComponentService(dbClient, i18n, userSession, System2.INSTANCE, new ComponentFinder(dbClient), projectMeasuresIndexer, componentIndexer);
     underTest.create(session, NewComponent.create(projectKey, projectKey));
 
     verify(componentDao).delete(session, 2L);

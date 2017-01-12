@@ -35,6 +35,8 @@ import org.sonar.db.DbTester;
 import org.sonar.db.component.ComponentDbTester;
 import org.sonar.db.component.ComponentDto;
 import org.sonar.db.component.ComponentTesting;
+import org.sonar.server.component.index.ComponentIndexDefinition;
+import org.sonar.server.component.index.ComponentIndexer;
 import org.sonar.server.es.EsTester;
 import org.sonar.server.exceptions.BadRequestException;
 import org.sonar.server.exceptions.ForbiddenException;
@@ -65,7 +67,8 @@ public class ComponentServiceUpdateKeyTest {
   public ExpectedException expectedException = ExpectedException.none();
 
   @Rule
-  public EsTester es = new EsTester(new ProjectMeasuresIndexDefinition(new MapSettings()));
+  public EsTester es = new EsTester(new ProjectMeasuresIndexDefinition(new MapSettings()),
+    new ComponentIndexDefinition(new MapSettings()));
 
   @Rule
   public DbTester db = DbTester.create(system2);
@@ -77,6 +80,7 @@ public class ComponentServiceUpdateKeyTest {
   I18nRule i18n = new I18nRule();
 
   ProjectMeasuresIndexer projectMeasuresIndexer = new ProjectMeasuresIndexer(system2, dbClient, es.client());
+  ComponentIndexer componentIndexer = new ComponentIndexer(dbClient, es.client());
 
   ComponentService underTest;
 
@@ -84,7 +88,7 @@ public class ComponentServiceUpdateKeyTest {
   public void setUp() {
     i18n.put("qualifier.TRK", "Project");
 
-    underTest = new ComponentService(dbClient, i18n, userSession, system2, new ComponentFinder(dbClient), projectMeasuresIndexer);
+    underTest = new ComponentService(dbClient, i18n, userSession, system2, new ComponentFinder(dbClient), projectMeasuresIndexer, componentIndexer);
   }
 
   @Test
