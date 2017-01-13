@@ -35,6 +35,7 @@ import org.sonar.db.DbTester;
 import org.sonar.db.component.ComponentDbTester;
 import org.sonar.db.component.ComponentDto;
 import org.sonar.db.component.ComponentTesting;
+import org.sonar.server.component.index.ComponentIndex;
 import org.sonar.server.component.index.ComponentIndexDefinition;
 import org.sonar.server.component.index.ComponentIndexer;
 import org.sonar.server.es.EsTester;
@@ -53,6 +54,8 @@ import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import static org.sonar.db.component.ComponentTesting.newFileDto;
 import static org.sonar.db.component.ComponentTesting.newModuleDto;
 import static org.sonar.db.component.ComponentTesting.newProjectDto;
+import static org.sonar.server.component.index.ComponentIndexDefinition.INDEX_COMPONENTS;
+import static org.sonar.server.component.index.ComponentIndexDefinition.TYPE_COMPONENT;
 import static org.sonar.server.measure.index.ProjectMeasuresIndexDefinition.INDEX_PROJECT_MEASURES;
 import static org.sonar.server.measure.index.ProjectMeasuresIndexDefinition.TYPE_PROJECT_MEASURES;
 
@@ -81,6 +84,7 @@ public class ComponentServiceUpdateKeyTest {
 
   ProjectMeasuresIndexer projectMeasuresIndexer = new ProjectMeasuresIndexer(system2, dbClient, es.client());
   ComponentIndexer componentIndexer = new ComponentIndexer(dbClient, es.client());
+  ComponentIndex componentIndex = new ComponentIndex(es.client(), userSession);
 
   ComponentService underTest;
 
@@ -244,8 +248,13 @@ public class ComponentServiceUpdateKeyTest {
 
   private ComponentDto insertProject(String key) {
     ComponentDto project = componentDb.insertComponent(newProjectDto().setKey(key));
-    projectMeasuresIndexer.index(project.uuid());
+    index(project.uuid());
     return project;
+  }
+
+  private void index(String projectUuid) {
+    projectMeasuresIndexer.index(projectUuid);
+    componentIndexer.indexByProjectUuid(projectUuid);
   }
 
   private void assertComponentKeyHasBeenUpdated(String oldKey, String newKey) {
@@ -260,6 +269,11 @@ public class ComponentServiceUpdateKeyTest {
       .setQuery(boolQuery().must(matchAllQuery()).filter(
         boolQuery().must(termQuery(ProjectMeasuresIndexDefinition.FIELD_KEY, key))));
     assertThat(request.get().getHits()).hasSize(1);
-  }
 
+    es.client().prepareSearch(INDEX_COMPONENTS)
+      .setTypes(TYPE_COMPONENT)
+      .setQuery(boolQuery().must(matchAllQuery()).filter(
+        boolQuery().must(termQuery(ComponentIndexDefinition.FIELD_KEY, key))));
+    assertThat(request.get().getHits()).hasSize(1);
+  }
 }

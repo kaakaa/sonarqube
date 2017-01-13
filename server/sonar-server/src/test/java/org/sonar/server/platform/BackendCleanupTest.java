@@ -24,7 +24,11 @@ import org.junit.Test;
 import org.sonar.api.config.MapSettings;
 import org.sonar.api.utils.System2;
 import org.sonar.db.DbTester;
+import org.sonar.db.component.ComponentTesting;
 import org.sonar.db.rule.RuleTesting;
+import org.sonar.server.component.index.ComponentDoc;
+import org.sonar.server.component.index.ComponentIndexDefinition;
+import org.sonar.server.component.index.ComponentIndexer;
 import org.sonar.server.es.EsTester;
 import org.sonar.server.issue.IssueDocTesting;
 import org.sonar.server.issue.index.IssueIndexDefinition;
@@ -45,7 +49,8 @@ public class BackendCleanupTest {
     new RuleIndexDefinition(new MapSettings()),
     new IssueIndexDefinition(new MapSettings()),
     new ViewIndexDefinition(new MapSettings()),
-    new ProjectMeasuresIndexDefinition(new MapSettings()));
+    new ProjectMeasuresIndexDefinition(new MapSettings()),
+    new ComponentIndexDefinition(new MapSettings()));
 
   @Rule
   public DbTester dbTester = DbTester.create(System2.INSTANCE);
@@ -68,10 +73,12 @@ public class BackendCleanupTest {
   public void clear_indexes() throws Exception {
     esTester.putDocuments(IssueIndexDefinition.INDEX, IssueIndexDefinition.TYPE_ISSUE, IssueDocTesting.newDoc());
     esTester.putDocuments(RuleIndexDefinition.INDEX, RuleIndexDefinition.TYPE_RULE, newRuleDoc());
+    esTester.putDocuments(ComponentIndexDefinition.INDEX_COMPONENTS, ComponentIndexDefinition.TYPE_COMPONENT, newComponentDoc());
 
     backendCleanup.clearIndexes();
 
     assertThat(esTester.countDocuments(IssueIndexDefinition.INDEX, IssueIndexDefinition.TYPE_ISSUE)).isEqualTo(0);
+    assertThat(esTester.countDocuments(ComponentIndexDefinition.INDEX_COMPONENTS, ComponentIndexDefinition.TYPE_COMPONENT)).isEqualTo(0);
   }
 
   @Test
@@ -79,11 +86,13 @@ public class BackendCleanupTest {
     dbTester.prepareDbUnit(getClass(), "shared.xml");
     esTester.putDocuments(IssueIndexDefinition.INDEX, IssueIndexDefinition.TYPE_ISSUE, IssueDocTesting.newDoc());
     esTester.putDocuments(RuleIndexDefinition.INDEX, RuleIndexDefinition.TYPE_RULE, newRuleDoc());
+    esTester.putDocuments(ComponentIndexDefinition.INDEX_COMPONENTS, ComponentIndexDefinition.TYPE_COMPONENT, newComponentDoc());
 
     backendCleanup.clearAll();
 
     assertThat(esTester.countDocuments(IssueIndexDefinition.INDEX, IssueIndexDefinition.TYPE_ISSUE)).isEqualTo(0);
     assertThat(esTester.countDocuments(RuleIndexDefinition.INDEX, RuleIndexDefinition.TYPE_RULE)).isEqualTo(0);
+    assertThat(esTester.countDocuments(ComponentIndexDefinition.INDEX_COMPONENTS, ComponentIndexDefinition.TYPE_COMPONENT)).isEqualTo(0);
 
     assertThat(dbTester.countRowsOfTable("projects")).isEqualTo(0);
     assertThat(dbTester.countRowsOfTable("snapshots")).isEqualTo(0);
@@ -101,6 +110,7 @@ public class BackendCleanupTest {
       .setId("PROJECT")
       .setKey("Key")
       .setName("Name"));
+    esTester.putDocuments(ComponentIndexDefinition.INDEX_COMPONENTS, ComponentIndexDefinition.TYPE_COMPONENT, newComponentDoc());
 
     backendCleanup.resetData();
 
@@ -110,6 +120,7 @@ public class BackendCleanupTest {
     assertThat(esTester.countDocuments(IssueIndexDefinition.INDEX, IssueIndexDefinition.TYPE_ISSUE)).isZero();
     assertThat(esTester.countDocuments(ViewIndexDefinition.INDEX, ViewIndexDefinition.TYPE_VIEW)).isZero();
     assertThat(esTester.countDocuments(ProjectMeasuresIndexDefinition.INDEX_PROJECT_MEASURES, ProjectMeasuresIndexDefinition.TYPE_PROJECT_MEASURES)).isZero();
+    assertThat(esTester.countDocuments(ComponentIndexDefinition.INDEX_COMPONENTS, ComponentIndexDefinition.TYPE_COMPONENT)).isZero();
 
     // Rules should not be removed
     assertThat(dbTester.countRowsOfTable("rules")).isEqualTo(1);
@@ -118,5 +129,9 @@ public class BackendCleanupTest {
 
   private static RuleDoc newRuleDoc() {
     return new RuleDoc().setKey(RuleTesting.XOO_X1.toString()).setRepository(RuleTesting.XOO_X1.repository());
+  }
+
+  private static ComponentDoc newComponentDoc() {
+    return ComponentIndexer.toDocument(ComponentTesting.newProjectDto());
   }
 }

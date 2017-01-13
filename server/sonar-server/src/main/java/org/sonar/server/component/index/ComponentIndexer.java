@@ -36,10 +36,8 @@ import org.sonar.db.component.ComponentDto;
 import org.sonar.server.es.BulkIndexer;
 import org.sonar.server.es.EsClient;
 
-import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
-import static org.elasticsearch.index.query.QueryBuilders.termQuery;
-import static org.sonar.server.component.index.ComponentIndexDefinition.FIELD_PROJECT_UUID;
 import static org.sonar.server.component.index.ComponentIndexDefinition.INDEX_COMPONENTS;
+import static org.sonar.server.component.index.ComponentIndexDefinition.TYPE_AUTHORIZATION;
 import static org.sonar.server.component.index.ComponentIndexDefinition.TYPE_COMPONENT;
 
 public class ComponentIndexer implements Startable {
@@ -87,12 +85,17 @@ public class ComponentIndexer implements Startable {
     }
   }
 
-  public void deleteByProjectUuid(String projectUuid) {
-    BulkIndexer.delete(esClient, INDEX_COMPONENTS, esClient
-      .prepareSearch(INDEX_COMPONENTS)
-      .setTypes(TYPE_COMPONENT)
-      .setFetchSource(false)
-      .setQuery(boolQuery().filter(termQuery(FIELD_PROJECT_UUID, projectUuid))));
+  public void deleteByProjectUuid(String uuid) {
+    esClient
+      .prepareDelete(INDEX_COMPONENTS, TYPE_COMPONENT, uuid)
+      .setRouting(uuid)
+      .setRefresh(true)
+      .get();
+    esClient
+      .prepareDelete(INDEX_COMPONENTS, TYPE_AUTHORIZATION, uuid)
+      .setRouting(uuid)
+      .setRefresh(true)
+      .get();
   }
 
   void index(ComponentDto... docs) {
@@ -117,10 +120,12 @@ public class ComponentIndexer implements Startable {
 
   private static IndexRequest newIndexRequest(ComponentDoc doc) {
     return new IndexRequest(INDEX_COMPONENTS, TYPE_COMPONENT, doc.getId())
+      .routing(doc.getRouting())
+      .parent(doc.getParent())
       .source(doc.getFields());
   }
 
-  private static ComponentDoc toDocument(ComponentDto component) {
+  public static ComponentDoc toDocument(ComponentDto component) {
     return new ComponentDoc()
       .setId(component.uuid())
       .setName(component.name())
